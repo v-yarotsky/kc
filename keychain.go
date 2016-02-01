@@ -14,6 +14,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"unsafe"
 )
@@ -29,7 +30,6 @@ type AlfredOutputItem struct {
 	Autocomplete string   `xml:"autocomplete,attr"`
 	Title        string   `xml:"title"`
 	Arg          string   `xml:"arg"`
-	pos          int
 }
 
 func main() {
@@ -66,13 +66,39 @@ func toAlfredItems(items []string) AlfredOutputItems {
 	return alfredOut
 }
 
+type match struct {
+	s   string
+	pos int
+}
+
+type matchList []match
+
+func (lst matchList) Len() int {
+	return len(lst)
+}
+
+func (lst matchList) Swap(i, j int) {
+	lst[i], lst[j] = lst[j], lst[i]
+}
+
+func (lst matchList) Less(i, j int) bool {
+	return lst[i].pos < lst[j].pos
+}
+
 func filterStringsIgnoreCase(strs []string, pattern string) []string {
-	var result = make([]string, 0, len(strs))
+	var matches = make(matchList, 0, len(strs))
 	for _, s := range strs {
-		if !strings.Contains(strings.ToUpper(s), pattern) {
+		matchPos := strings.Index(strings.ToUpper(s), pattern)
+		if matchPos == -1 {
 			continue
 		}
-		result = append(result, s)
+		matches = append(matches, match{s, matchPos})
+	}
+	sort.Sort(matches)
+
+	var result = make([]string, 0, len(strs))
+	for _, m := range matches {
+		result = append(result, m.s)
 	}
 	return result
 }
