@@ -1,5 +1,20 @@
 #include "keychain.h"
 
+const char * cf_string_to_c_string_copy(CFStringRef str) {
+  if (str == NULL) {
+    return NULL;
+  }
+
+  CFIndex length = CFStringGetLength(str);
+  CFIndex maxSize = CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8) + 1;
+  char *buffer = (char *)malloc(maxSize);
+  if (CFStringGetCString(str, buffer, maxSize,
+        kCFStringEncodingUTF8)) {
+    return buffer;
+  }
+  return NULL;
+}
+
 const struct keychain_items * list_keychain_items() {
   CFMutableDictionaryRef query = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
                                     &kCFTypeDictionaryKeyCallBacks,
@@ -12,17 +27,21 @@ const struct keychain_items * list_keychain_items() {
   CFTypeRef result = NULL;
   SecItemCopyMatching(query, &result);
   CFIndex i, c = CFArrayGetCount(result);
-  CFStringRef *services = (CFStringRef *) malloc(c * sizeof(CFStringRef));
+  const char** services = (const char **) malloc(c * sizeof(char *));
+  long idx = 0;
   for (i = 0; i < c; i++) {
     CFDictionaryRef dict = CFArrayGetValueAtIndex(result, i);
+    if (CFDictionaryContainsKey(dict, CFSTR("desc"))) {
+      continue;
+    }
     CFStringRef svc = CFDictionaryGetValue(dict, CFSTR("svce"));
-    services[i] = svc;
+    services[idx++] = cf_string_to_c_string_copy(svc);
   }
-  /* if (result != NULL) CFRelease(result); */ // should really free this
+  if (result != NULL) CFRelease(result);
   CFRelease(query);
   struct keychain_items *items = malloc(sizeof(struct keychain_items));
   items->Items = services;
-  items->Count = c;
+  items->Count = idx;
   return items;
 }
 

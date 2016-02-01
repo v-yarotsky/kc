@@ -6,7 +6,7 @@
 #include <Security/SecItem.h>
 
 struct keychain_items {
-  CFStringRef * Items;
+  const char** Items;
   long Count;
 };
 

@@ -85,10 +85,11 @@ func keychainItems() []string {
 	defer C.free(unsafe.Pointer(itemsPtr.Items))
 	defer C.free(unsafe.Pointer(itemsPtr))
 
-	cfstrings := (*[1 << 30]C.CFStringRef)(unsafe.Pointer(itemsPtr.Items))[:length:length]
+	cstrings := (*[1 << 30]*C.char)(unsafe.Pointer(itemsPtr.Items))[:length:length]
 
-	for _, s := range cfstrings {
-		str := CFStringToStr(s)
+	for _, s := range cstrings {
+		str := C.GoString(s)
+		defer C.free(unsafe.Pointer(s))
 		items = append(items, str)
 	}
 	return items
