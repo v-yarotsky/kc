@@ -5,8 +5,13 @@
 #include <Security/SecKeychainItem.h>
 #include <Security/SecItem.h>
 
+struct keychain_item {
+  const char *Label;
+  const char *Service;
+};
+
 struct keychain_items {
-  const char** Items;
+  const struct keychain_item** Items;
   long Count;
 };
 

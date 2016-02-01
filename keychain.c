@@ -8,8 +8,7 @@ const char * cf_string_to_c_string_copy(CFStringRef str) {
   CFIndex length = CFStringGetLength(str);
   CFIndex maxSize = CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8) + 1;
   char *buffer = (char *)malloc(maxSize);
-  if (CFStringGetCString(str, buffer, maxSize,
-        kCFStringEncodingUTF8)) {
+  if (CFStringGetCString(str, buffer, maxSize, kCFStringEncodingUTF8)) {
     return buffer;
   }
   return NULL;
@@ -27,21 +26,27 @@ const struct keychain_items * list_keychain_items() {
   CFTypeRef result = NULL;
   SecItemCopyMatching(query, &result);
   CFIndex i, c = CFArrayGetCount(result);
-  const char** services = (const char **) malloc(c * sizeof(char *));
+  const struct keychain_item** items = (const struct keychain_item **) malloc(c * sizeof(struct keychain_item*));
   long idx = 0;
   for (i = 0; i < c; i++) {
     CFDictionaryRef dict = CFArrayGetValueAtIndex(result, i);
     if (CFDictionaryContainsKey(dict, CFSTR("desc"))) {
       continue;
     }
+    CFStringRef label = CFDictionaryGetValue(dict, CFSTR("labl"));
     CFStringRef svc = CFDictionaryGetValue(dict, CFSTR("svce"));
-    services[idx++] = cf_string_to_c_string_copy(svc);
+    struct keychain_item *item = malloc(sizeof(struct keychain_item));
+    item->Label = cf_string_to_c_string_copy(label);
+    item->Service = cf_string_to_c_string_copy(svc);
+    items[idx++] = item;
   }
-  if (result != NULL) CFRelease(result);
+  if (result != NULL) {
+    CFRelease(result);
+  }
   CFRelease(query);
-  struct keychain_items *items = malloc(sizeof(struct keychain_items));
-  items->Items = services;
-  items->Count = idx;
-  return items;
+  struct keychain_items *items_struct = malloc(sizeof(struct keychain_items));
+  items_struct->Items = items;
+  items_struct->Count = idx;
+  return items_struct;
 }
 

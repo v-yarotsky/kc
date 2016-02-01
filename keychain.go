@@ -38,7 +38,7 @@ func main() {
 		pattern = strings.ToUpper(os.Args[1])
 	}
 
-	items := filterStringsIgnoreCase(keychainItems(), pattern)
+	items := filterKeychainItemsIgnoreCase(keychainItems(), pattern)
 	alfredItems := toAlfredItems(items)
 	rawXML := toXML(alfredItems)
 	fmt.Println(rawXML)
@@ -53,22 +53,22 @@ func toXML(alfredOut AlfredOutputItems) string {
 	return xmlWithHeader
 }
 
-func toAlfredItems(items []string) AlfredOutputItems {
+func toAlfredItems(items []keychainItem) AlfredOutputItems {
 	alfredOut := AlfredOutputItems{Items: make([]AlfredOutputItem, 0, 10)}
 	for _, item := range items {
 		alfredOut.Items = append(alfredOut.Items, AlfredOutputItem{
-			UID:          "kc:" + item,
-			Autocomplete: item,
-			Title:        item,
-			Arg:          item,
+			UID:          "kc:" + item.Label,
+			Autocomplete: item.Label,
+			Title:        fmt.Sprintf("%s (%s)", item.Label, item.Service),
+			Arg:          item.Label,
 		})
 	}
 	return alfredOut
 }
 
 type match struct {
-	s   string
-	pos int
+	item keychainItem
+	pos  int
 }
 
 type matchList []match
@@ -85,43 +85,48 @@ func (lst matchList) Less(i, j int) bool {
 	return lst[i].pos < lst[j].pos
 }
 
-func filterStringsIgnoreCase(strs []string, pattern string) []string {
-	var matches = make(matchList, 0, len(strs))
-	for _, s := range strs {
-		matchPos := strings.Index(strings.ToUpper(s), pattern)
+func filterKeychainItemsIgnoreCase(items []keychainItem, pattern string) []keychainItem {
+	var matches = make(matchList, 0, len(items))
+	for _, item := range items {
+		matchPos := strings.Index(strings.ToUpper(item.Label), pattern)
 		if matchPos == -1 {
 			continue
 		}
-		matches = append(matches, match{s, matchPos})
+		matches = append(matches, match{item, matchPos})
 	}
 	sort.Sort(matches)
 
-	var result = make([]string, 0, len(strs))
+	var result = make([]keychainItem, 0, len(items))
 	for _, m := range matches {
-		result = append(result, m.s)
+		result = append(result, m.item)
 	}
 	return result
 }
 
-func keychainItems() []string {
-	var itemsPtr *C.struct_keychain_items = C.list_keychain_items()
+type keychainItem struct {
+	Label   string
+	Service string
+}
+
+func keychainItems() []keychainItem {
+	itemsPtr := C.list_keychain_items()
 	length := int(itemsPtr.Count)
-	var items = make([]string, length)
+	var items = make([]keychainItem, length)
 
 	defer C.free(unsafe.Pointer(itemsPtr.Items))
 	defer C.free(unsafe.Pointer(itemsPtr))
 
-	cstrings := (*[1 << 30]*C.char)(unsafe.Pointer(itemsPtr.Items))[:length:length]
+	citems := (*[1 << 30]*C.struct_keychain_item)(unsafe.Pointer(itemsPtr.Items))[:length:length]
 
-	for _, s := range cstrings {
-		str := C.GoString(s)
-		defer C.free(unsafe.Pointer(s))
-		items = append(items, str)
+	for _, citem := range citems {
+		defer C.free(unsafe.Pointer(citem.Label))
+		defer C.free(unsafe.Pointer(citem.Service))
+
+		item := keychainItem{
+			Label:   C.GoString(citem.Label),
+			Service: C.GoString(citem.Service),
+		}
+		items = append(items, item)
 	}
 	return items
-}
-
-func CFStringToStr(cs C.CFStringRef) string {
-	valcstr := C.CFStringGetCStringPtr(cs, C.kCFStringEncodingUTF8)
-	return C.GoString(valcstr)
 }
