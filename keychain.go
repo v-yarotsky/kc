@@ -6,6 +6,7 @@ package main
 #include "keychain.h"
 
 extern struct keychain_items* list_keychain_items();
+extern void free_keychain_items(const struct keychain_items*);
 
 */
 import "C"
@@ -59,7 +60,7 @@ func toAlfredItems(items []keychainItem) AlfredOutputItems {
 		alfredOut.Items = append(alfredOut.Items, AlfredOutputItem{
 			UID:          "kc:" + item.Label,
 			Autocomplete: item.Label,
-			Title:        fmt.Sprintf("%s (%s)", item.Label, item.Service),
+			Title:        fmt.Sprintf("%s (%s @ %s)", item.Label, item.Account, item.Service),
 			Arg:          item.Label,
 		})
 	}
@@ -106,25 +107,26 @@ func filterKeychainItemsIgnoreCase(items []keychainItem, pattern string) []keych
 type keychainItem struct {
 	Label   string
 	Service string
+	Account string
 }
 
 func keychainItems() []keychainItem {
 	itemsPtr := C.list_keychain_items()
-	length := int(itemsPtr.Count)
-	var items = make([]keychainItem, length)
+	defer C.free_keychain_items(itemsPtr)
 
-	defer C.free(unsafe.Pointer(itemsPtr.Items))
-	defer C.free(unsafe.Pointer(itemsPtr))
+	length := int(itemsPtr.Count)
+	var items = make([]keychainItem, 0, length)
 
 	citems := (*[1 << 30]*C.struct_keychain_item)(unsafe.Pointer(itemsPtr.Items))[:length:length]
 
 	for _, citem := range citems {
-		defer C.free(unsafe.Pointer(citem.Label))
-		defer C.free(unsafe.Pointer(citem.Service))
-
+		if citem.Label == nil {
+			continue
+		}
 		item := keychainItem{
 			Label:   C.GoString(citem.Label),
 			Service: C.GoString(citem.Service),
+			Account: C.GoString(citem.Account),
 		}
 		items = append(items, item)
 	}

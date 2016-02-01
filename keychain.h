@@ -6,6 +6,7 @@
 #include <Security/SecItem.h>
 
 struct keychain_item {
+  const char *Account;
   const char *Label;
   const char *Service;
 };

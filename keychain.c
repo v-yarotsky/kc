@@ -35,9 +35,11 @@ const struct keychain_items * list_keychain_items() {
     }
     CFStringRef label = CFDictionaryGetValue(dict, CFSTR("labl"));
     CFStringRef svc = CFDictionaryGetValue(dict, CFSTR("svce"));
+    CFStringRef acct = CFDictionaryGetValue(dict, CFSTR("acct"));
     struct keychain_item *item = malloc(sizeof(struct keychain_item));
     item->Label = cf_string_to_c_string_copy(label);
     item->Service = cf_string_to_c_string_copy(svc);
+    item->Account = cf_string_to_c_string_copy(acct);
     items[idx++] = item;
   }
   if (result != NULL) {
@@ -48,5 +50,25 @@ const struct keychain_items * list_keychain_items() {
   items_struct->Items = items;
   items_struct->Count = idx;
   return items_struct;
+}
+
+void free_keychain_items(const struct keychain_items *itms) {
+  if (itms == NULL) {
+    return;
+  }
+
+  for (int i = 0; i < itms->Count; i++) {
+    const struct keychain_item *itm = itms->Items[i];
+    if (itm == NULL) {
+      continue;
+    }
+    free((void *)itm->Account);
+    free((void *)itm->Label);
+    free((void *)itm->Service);
+    free((void *)itm);
+  }
+
+  free(itms->Items);
+  free((void *)itms);
 }
 
